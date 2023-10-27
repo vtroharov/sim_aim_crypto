@@ -1,0 +1,6 @@
+Increment = 3
+Init_Percent = 50
+Buy_Sens = 5
+Sell_Sens = 50
+EMA_Deviation = 30
+EMA_Days = 20
