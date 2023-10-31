@@ -84,17 +84,18 @@ def exec_algo(starting_amount, current_price, crypto, buy_sens_percent, sell_sen
     sell_sens = -crypto * current_price * (sell_sens_percent / 100)
     value = starting_amount - (crypto * current_price)
     ema_decision = abs(ema/current_price*100 - 100)
-    if value > buy_sens:
-        if value > min_transact and ema_decision < ema_percent:
-            value = value - buy_sens
-            print(coloring.blight_steel_blue("Bot Buys $" + str(round(value, 2)) + " worth of ETH."))
+    if float(value) > float(buy_sens):
+        if float(value) > float(min_transact) and float(ema_decision) < float(ema_percent):
+            print(value, min_transact)
+            value = float(value) - float(buy_sens)
+            print(coloring.blight_steel_blue("Bot Buys $" + str(round(value, 2)) +" worth of ETH."))
             # Insert Buy API call here
         else:
             value = 0
             print(coloring.bmedium_sea_green("Bot HODLs."))
-    elif value < sell_sens:
-        if abs(value) > min_transact and ema_decision < ema_percent:
-            value = value - sell_sens
+    elif float(value) < float(sell_sens):
+        if abs(float(value)) > float(min_transact) and float(ema_decision) < float(ema_percent):
+            value = float(value) - float(sell_sens)
             print(coloring.indian_red("Bot Sells $" + str(abs(round(value, 2))) + " worth of ETH."))
             # Insert Sell API call here
         else:
@@ -267,18 +268,19 @@ def execute_real_order():
     in_file = open("ethereum_exec.json", "r")
     data = json.load(in_file)
 
+    first_buy = 1790
     ema_days = 20
     fee_percent = 1
     starting_amount = 10000
     init_percent = 50
     cash = starting_amount * init_percent / 100
-    crypto = (starting_amount * init_percent / 100) / data[-1][1]
+    crypto = (starting_amount * init_percent / 100) / first_buy
     dates_ema, ema_plot, price_plot = get_ema(data, ema_days)
     for d in data:
         date_index = dates_ema.index(d[0] / 1000)
         ema = ema_plot[date_index]
     # Execute check every 3 days (Can use Epoch from data file to determine.
-    result = exec_algo(starting_amount, data[-1][1], crypto, 50, 5, 100, ema_days, 30)
+    result = exec_algo(cash, data[-1][1], crypto, 5, 5, 100, 30, ema)
     crypto = crypto + (result / d[1])
     fee = abs(result * fee_percent / 100)
     cash = cash - result - fee
@@ -288,6 +290,7 @@ def execute_real_order():
 
 
 if __name__ == '__main__':
+    # ARGS: extract_data, print_data, market_struct, sim_data, vast_data, real_exec
     # try:
         # - Coin ID must be given to save_data, eg. ethereum
         if sys.argv[1] == "extract_data":
@@ -323,6 +326,7 @@ if __name__ == '__main__':
         # - Min AIM transaction
         # - % EMA deviation
         # - EMA Days
+        # - Plot?
         elif sys.argv[1] == "sim_data":
             if len(sys.argv) < 3:
                 in_file = open("ethereum.json", "r")
@@ -335,7 +339,7 @@ if __name__ == '__main__':
                 print("Using DEFAULT settings...(sim_data ethereum monthly 10000 50 2022-01-01 2022-06-01 10 10 1 50 10 50)")
                 print("----------------------------------------------------------------------------------------------------")
                 # hodl, cash, crypto, value = simulate_aim(data, 'monthly', 10000, 50, '2021-01-01', '2022-06-01', 10, 10, 1, 50, 10, 50, 'plot')
-                hodl, cash, crypto, value = simulate_aim(data, 3, 10000, 50, '2018-10-01', '2019-10-01', 5, 50, 1, 100, 30, 20, 'none')
+                hodl, cash, crypto, value = simulate_aim(data, 3, 10000, 50, '2022-10-30', '2023-10-30', 5, 5, 1, 100, 30, 20, 'none')
             else:
                 hodl, cash, crypto, value = simulate_aim(data, sys.argv[3], float(sys.argv[4]), float(sys.argv[5]), sys.argv[6], sys.argv[7], float(sys.argv[8]),
                              float(sys.argv[9]), float(sys.argv[10]), float(sys.argv[11]), float(sys.argv[12]), float(sys.argv[13]), 'plot')
