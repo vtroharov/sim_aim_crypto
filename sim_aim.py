@@ -9,14 +9,16 @@ import yfinance as yf
 import numpy as np
 import matplotlib.pyplot as plt
 import csv
+import os
 
 
 def save_data(coin, extra):
     response = requests.get(
         "https://api.coingecko.com/api/v3/coins/" + coin + "/market_chart?vs_currency=usd&days=max&interval=daily")
+    print(response)
     data = response.json()
     out_file = open(coin + extra + ".json", "w")
-    json.dump(data['prices'], out_file, indent=4)
+    json.dump(data['prices'][:-1], out_file, indent=4)
     out_file.close()
 
 
@@ -79,24 +81,23 @@ def get_usable_dates(data, increment, init_date, end_date):
     return data_out
 
 
-def exec_algo(starting_amount, current_price, crypto, buy_sens_percent, sell_sens_percent, min_transact, ema, ema_percent):
+def exec_algo(coin, starting_amount, current_price, crypto, buy_sens_percent, sell_sens_percent, min_transact, ema, ema_percent):
     buy_sens = crypto * current_price * (buy_sens_percent / 100)
     sell_sens = -crypto * current_price * (sell_sens_percent / 100)
     value = starting_amount - (crypto * current_price)
     ema_decision = abs(ema/current_price*100 - 100)
     if float(value) > float(buy_sens):
+        value = float(value) - float(buy_sens)
         if float(value) > float(min_transact) and float(ema_decision) < float(ema_percent):
-            print(value, min_transact)
-            value = float(value) - float(buy_sens)
-            print(coloring.blight_steel_blue("Bot Buys $" + str(round(value, 2)) +" worth of ETH."))
+            print(coloring.blight_steel_blue("Bot Buys " + str(round(value/current_price, 4)) + " of " + coin.title() + "."))
             # Insert Buy API call here
         else:
             value = 0
             print(coloring.bmedium_sea_green("Bot HODLs."))
     elif float(value) < float(sell_sens):
+        value = float(value) - float(sell_sens)
         if abs(float(value)) > float(min_transact) and float(ema_decision) < float(ema_percent):
-            value = float(value) - float(sell_sens)
-            print(coloring.indian_red("Bot Sells $" + str(abs(round(value, 2))) + " worth of ETH."))
+            print(coloring.indian_red("Bot Sells " + str(round(abs(value)/current_price, 4)) + " of " + coin.title() + "."))
             # Insert Sell API call here
         else:
             value = 0
@@ -125,7 +126,7 @@ def plot_ema(dates, ema, price):
     plt.legend(title='Data', loc='upper left')
 
 
-def simulate_aim(data, increment, starting_amount, init_percent, init_date, end_date, buy_sens_percent,
+def simulate_aim(coin, data, increment, starting_amount, init_percent, init_date, end_date, buy_sens_percent,
                  sell_sens_percent, fee_percent, min_transact, ema_percent, ema_days, plot):
     if isinstance(init_date, str) == True and isinstance(end_date, str) == True:
         init_date = init_date.split('-')
@@ -150,7 +151,7 @@ def simulate_aim(data, increment, starting_amount, init_percent, init_date, end_
         print("Date:", datetime.datetime.fromtimestamp(d[0] / 1000).strftime('%Y-%m-%d'), "\t- Price:", round(d[1], 2),
               "\t- Cash:", round(cash, 2), "\t- Crypto:", round(crypto, 3), "\t- Value:",
               round((crypto * d[1] + cash), 2), "\t- Consejo:", round(starting_amount - (crypto * d[1]), 2))
-        result = exec_algo(starting_amount, d[1], crypto, buy_sens_percent, sell_sens_percent, min_transact, ema, ema_percent)
+        result = exec_algo(coin, starting_amount, d[1], crypto, buy_sens_percent, sell_sens_percent, min_transact, ema, ema_percent)
         crypto = crypto + (result / d[1])
         fee = abs(result * fee_percent / 100)
         cash = cash - result - fee
@@ -174,7 +175,7 @@ def get_market_struct(ticker):
     start = "2018-01-01"
     df = yf.download(tickers=ticker, start=start)
     df = df.reset_index()
-
+    print(df)
     max_drawdown = 35
     x = len(df)
     trend = ''
@@ -264,11 +265,11 @@ def arg_error():
 
 
 def execute_real_order():
-    save_data('ethereum', "_exec")
-    in_file = open("ethereum_exec.json", "r")
+    save_data('ethereum', "")
+    in_file = open("ethereum.json", "r")
     data = json.load(in_file)
 
-    first_buy = 1790
+    first_buy = 1798.17
     ema_days = 20
     fee_percent = 1
     starting_amount = 10000
@@ -280,13 +281,13 @@ def execute_real_order():
         date_index = dates_ema.index(d[0] / 1000)
         ema = ema_plot[date_index]
     # Execute check every 3 days (Can use Epoch from data file to determine.
-    result = exec_algo(cash, data[-1][1], crypto, 5, 5, 100, 30, ema)
+    result = exec_algo(os.path.splitext(os.path.basename(in_file.name))[0], cash, data[-1][1], crypto, 5, 5, 50, 30, ema)
     crypto = crypto + (result / d[1])
     fee = abs(result * fee_percent / 100)
     cash = cash - result - fee
     value = str(round((crypto * data[-1][1] + cash), 2))
     print(coloring.bdodger_blue(
-        "Final Cash: " + str(cash) + " \t- Final Crypto: " + str(crypto) + " \t- Final Value: " + str(value) + " \t- ETH Price: " + str((data[-1][1]))))
+        "Final Cash: " + str(cash) + " \t- Final Crypto: " + str(crypto) + " \t- Final Value: " + str(value) + " \t- ETH Price: " + str(round((data[-1][1]),2))))
 
 
 if __name__ == '__main__':
@@ -329,19 +330,25 @@ if __name__ == '__main__':
         # - Plot?
         elif sys.argv[1] == "sim_data":
             if len(sys.argv) < 3:
+                save_data('ethereum', "")
                 in_file = open("ethereum.json", "r")
             else:
-
+                save_data(sys.argv[2], "")
                 in_file = open(sys.argv[2] + ".json", "r")
             data = json.load(in_file)
             if len(sys.argv) < 13:
-                arg_error()
-                print("Using DEFAULT settings...(sim_data ethereum monthly 10000 50 2022-01-01 2022-06-01 10 10 1 50 10 50)")
+                # arg_error()
+                print("Using DEFAULT settings...")
                 print("----------------------------------------------------------------------------------------------------")
-                # hodl, cash, crypto, value = simulate_aim(data, 'monthly', 10000, 50, '2021-01-01', '2022-06-01', 10, 10, 1, 50, 10, 50, 'plot')
-                hodl, cash, crypto, value = simulate_aim(data, 3, 10000, 50, '2022-10-30', '2023-10-30', 5, 5, 1, 100, 30, 20, 'none')
+                # hodl, cash, crypto, value = simulate_aim(coin, data, 'monthly', 10000, 50, '2021-01-01', '2022-06-01', 10, 10, 1, 50, 10, 50, 'plot')
+                if len(sys.argv) > 2 and sys.argv[2] == "ethereum":
+                    hodl, cash, crypto, value = simulate_aim(os.path.splitext(os.path.basename(in_file.name))[0], data, 1, 10000, 50, '2023-10-30', '2024-10-30', 5, 5, 1, 50, 30, 20, 'none')
+                elif len(sys.argv) > 2 and sys.argv[2] == "solana":
+                    hodl, cash, crypto, value = simulate_aim(os.path.splitext(os.path.basename(in_file.name))[0], data, 1, 5000, 50, '2023-11-14', '2024-10-30', 5, 5, 1, 50, 30, 20, 'none')
+                else:
+                    hodl, cash, crypto, value = simulate_aim(os.path.splitext(os.path.basename(in_file.name))[0], data, 1, 10000, 50, '2023-10-30', '2024-10-30', 5, 5, 1, 50, 30, 20, 'none')
             else:
-                hodl, cash, crypto, value = simulate_aim(data, sys.argv[3], float(sys.argv[4]), float(sys.argv[5]), sys.argv[6], sys.argv[7], float(sys.argv[8]),
+                hodl, cash, crypto, value = simulate_aim(os.path.splitext(os.path.basename(in_file.name))[0], data, sys.argv[3], float(sys.argv[4]), float(sys.argv[5]), sys.argv[6], sys.argv[7], float(sys.argv[8]),
                              float(sys.argv[9]), float(sys.argv[10]), float(sys.argv[11]), float(sys.argv[12]), float(sys.argv[13]), 'plot')
             plt.show(block=False)
             print(coloring.bdodger_blue("Final Cash: " + cash + " \t- Final Crypto: " + crypto + " \t- Final Value: " + value), coloring.bmedium_sea_green(" \t - HODL Value: " + hodl))
@@ -354,7 +361,7 @@ if __name__ == '__main__':
             init_amount = 100000
             init_percent = [50, 60, 70, 80]
             date_start = [coin_epoch_start]
-            for i in range(4):
+            for i in range(23):
                 date_start.append(coin_epoch_start + start_date_intervals)
                 start_date_intervals += 7884000000
             months = [12] #[6, 9, 12]
@@ -381,16 +388,18 @@ if __name__ == '__main__':
                     for c in date_start:
                         for d in months:
                             date_end = c + (d * 2628000000)
-                            if date_end > 1601510400000:            # 1667324019000: # - Current Date
+                            if date_end > 1699000000000:
+                            # if date_end > 1601510400000:            # 1667324019000: # - Current Date
+                                print("End Date Exceeded!")
                                 break
                             else:
                                 for e in buy_sens:
                                     for f in sell_sens:
                                         for g in ema_deviation:
                                             for h in ema_days:
-                                                hodl, cash, crypto, value = simulate_aim(data, a, init_amount, b, c, date_end, e, f, fee, min_trans, g, h, 'no_plot')
+                                                hodl, cash, crypto, value = simulate_aim(os.path.splitext(os.path.basename(in_file.name))[0], data, a, init_amount, b, c, date_end, e, f, fee, min_trans, g, h, 'no_plot')
                                                 j += 1
-                                                print(j)
+                                                # print(j)
                                                 # print(coloring.bdodger_blue("Final Cash: " + cash + " \t- Final Crypto: " + crypto + " \t- Final Value: " + value), coloring.bmedium_sea_green(" \t - HODL Value: " + hodl))
                                                 row = [coin, a, init_amount, b, (c / 1000), (date_end / 1000), d, e, f, fee, min_trans, g, h, cash, value, hodl]
                                                 writer.writerow(row)
