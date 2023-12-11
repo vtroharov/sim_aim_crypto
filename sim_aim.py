@@ -18,7 +18,11 @@ def save_data(coin, extra):
     print(response)
     data = response.json()
     out_file = open(coin + extra + ".json", "w")
-    json.dump(data['prices'][:-1], out_file, indent=4)
+    if coin == "ethereum":
+        json.dump(data['prices'], out_file, indent=4)
+    else:
+        json.dump(data['prices'][:-1], out_file, indent=4)
+    # json.dump(data['prices'][:-1], out_file, indent=4)
     out_file.close()
 
 
@@ -150,7 +154,7 @@ def simulate_aim(coin, data, increment, starting_amount, init_percent, init_date
         ema = ema_plot[date_index]
         print("Date:", datetime.datetime.fromtimestamp(d[0] / 1000).strftime('%Y-%m-%d'), "\t- Price:", round(d[1], 2),
               "\t- Cash:", round(cash, 2), "\t- Crypto:", round(crypto, 3), "\t- Value:",
-              round((crypto * d[1] + cash), 2), "\t- Consejo:", round(starting_amount - (crypto * d[1]), 2))
+              round((crypto * d[1] + cash), 2), "\t- Profit:", round(((crypto * d[1] + cash) - (starting_amount * 100 / init_percent)), 2)) #round(starting_amount - (crypto * d[1]), 2))
         result = exec_algo(coin, starting_amount, d[1], crypto, buy_sens_percent, sell_sens_percent, min_transact, ema, ema_percent)
         crypto = crypto + (result / d[1])
         fee = abs(result * fee_percent / 100)
